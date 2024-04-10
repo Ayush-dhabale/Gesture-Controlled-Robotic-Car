@@ -6,6 +6,8 @@ from src.logger import logging
 from src.exception import CustomException
 from dataclasses import dataclass
 
+
+ 
 #Initialize the controller configuration
 @dataclass
 class ControllerConfig:
@@ -137,4 +139,4 @@ class Controller:
 
 if __name__ == '__main__':
     Car = Controller()
-    Car.Move_car()
+    Car.move_car()
