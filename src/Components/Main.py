@@ -20,7 +20,8 @@ class ControllerConfig:
 
     cam = cv2.VideoCapture(0)
     detector = HandDetector(detectionCon=0.5,maxHands=1)
-    ser = serial.Serial('COM4',9600)
+    port = 'COM4' # replace  with your own port if different
+    ser = serial.Serial(port,9600)
 
 
 #Create a class to send the commands to Arduino via bluetooth
