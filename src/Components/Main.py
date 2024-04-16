@@ -1,6 +1,7 @@
 import cv2
 import sys
 import serial
+import serial.tools.list_ports
 from cvzone.HandTrackingModule import HandDetector
 from src.logger import logging
 from src.exception import CustomException
@@ -16,14 +17,10 @@ class ControllerConfig:
         Will use it to store three variables
         1. object of cam
         2. hand detector object
-        3. serial bluetooth connection
 
     '''
-
     cam = cv2.VideoCapture(0)
     detector = HandDetector(detectionCon=0.5,maxHands=1)
-    port = 'COM4' # replace  with your own port if different
-    ser = serial.Serial(port,9600)
 
 
 #Create a class to send the commands to Arduino via bluetooth
@@ -32,12 +29,16 @@ class SendCommands:
         '''
             count - no. of fingers up
             controllerconfig - object of the above data class ControllerConfig
+            communication_obj - Serial communication object
 
         '''
         logging.info("Sending command configuration starts")
         self.controllerconfig = ControllerConfig()
         logging.info("Sending command configuration completed")
         self.count = count
+        logging.info("Creating the object for serial communication")
+        self.communication_obj = SerialCommunication()
+        logging.info("Created the object for serial communication")
     
     #Create a method to send the message to arduino
     def send_message(self):
@@ -50,19 +51,66 @@ class SendCommands:
         try:
             num_fingers_str = str(self.count)
             logging.info("Writing the encoded message to serial monitor")
-            self.controllerconfig.ser.write(num_fingers_str.encode())
+            self.communication_obj.ser.write(num_fingers_str.encode())
 
         except Exception as e:
             logging.info("Error occured while sendinf the command")
             raise CustomException(e,sys)
 
-    
+class Port:
+    '''
+        class to select the port to which our hc 05 module is connected
+    '''
+    def __init__(self):
+        self.port = None
+
+    def select_port(self):
+        '''
+            Selects the port by looking at each avaiable port
+        '''
+        try:
+            logging.info("Creating the list of all available ports")
+            ports = serial.tools.list_ports.comports()
+            for port in ports:
+                if 'HC-05' in port.description:
+                # Extract the port name
+                    logging.info("Found port")
+                    self.port = self.port.device
+                    logging.info("Saved port")
+                    return self.port
+
+        except Exception as e:
+            logging.info("Error occured while selecting the port")
+            raise CustomException(e,sys)
+        
+    def connect(self):
+        try:
+            logging.info("Establishing the serial communication")
+            ser = serial.Serial(self.port,9600,timeout=1)
+            logging.info("Established serial communication")
+
+        except Exception as e:
+            logging.info("Error occured while establishing the serial communication")
+            raise CustomException(e,sys)
+
+class SerialCommunication:
+    '''
+        class to initiate the variables for serial communication
+    '''
+    def __init__(self):
+        self.portobject = Port()
+        self.port = self.portobject.select_port()
+        self.ser = serial.Serial(self.port,9600,timeout=1)
+        
+
 #Create a class to control the car  
 class Controller:
     def __init__(self) :
         logging.info("Controller configuration starts")
         self.controllerconfig = ControllerConfig()
         logging.info("Controller configuartion completed")
+        self.communication_obj = SerialCommunication()
+        
     
     #Create a method to move the car
     def move_car(self):
@@ -133,9 +181,9 @@ class Controller:
 
                 if cv2.waitKey(1)&0xFF == 27:
                     break
-        except Exception as e:
+        except KeyboardInterrupt as k:
             logging.info("Error occured while controlling the car")
-            raise CustomException(e,sys)
+            
 
 if __name__ == '__main__':
     Car = Controller()
