@@ -19,8 +19,17 @@ class ControllerConfig:
         2. hand detector object
 
     '''
+    #Object of camera
     cam = cv2.VideoCapture(0)
+
+    #Object of hand detector class
     detector = HandDetector(detectionCon=0.5,maxHands=1)
+
+    #defining the port
+    port = 'COM5'
+
+    #Establishing the serial communication
+    ser = serial.Serial(port,9600,timeout=1)
 
 
 #Create a class to send the commands to Arduino via bluetooth
@@ -29,16 +38,14 @@ class SendCommands:
         '''
             count - no. of fingers up
             controllerconfig - object of the above data class ControllerConfig
-            communication_obj - Serial communication object
+            
 
         '''
         logging.info("Sending command configuration starts")
         self.controllerconfig = ControllerConfig()
         logging.info("Sending command configuration completed")
         self.count = count
-        logging.info("Creating the object for serial communication")
-        self.communication_obj = SerialCommunication()
-        logging.info("Created the object for serial communication")
+        
     
     #Create a method to send the message to arduino
     def send_message(self):
@@ -49,59 +56,17 @@ class SendCommands:
 
         '''
         try:
+            #Convert the count of fingers to string
             num_fingers_str = str(self.count)
             logging.info("Writing the encoded message to serial monitor")
-            self.communication_obj.ser.write(num_fingers_str.encode())
+
+            #Write the code to serial monitor
+            self.controllerconfig.ser.write(num_fingers_str.encode())
 
         except Exception as e:
             logging.info("Error occured while sendinf the command")
             raise CustomException(e,sys)
 
-class Port:
-    '''
-        class to select the port to which our hc 05 module is connected
-    '''
-    def __init__(self):
-        self.port = None
-
-    def select_port(self):
-        '''
-            Selects the port by looking at each avaiable port
-        '''
-        try:
-            logging.info("Creating the list of all available ports")
-            ports = serial.tools.list_ports.comports()
-            for port in ports:
-                if 'HC-05' in port.description:
-                # Extract the port name
-                    logging.info("Found port")
-                    self.port = self.port.device
-                    logging.info("Saved port")
-                    return self.port
-
-        except Exception as e:
-            logging.info("Error occured while selecting the port")
-            raise CustomException(e,sys)
-        
-    def connect(self):
-        try:
-            logging.info("Establishing the serial communication")
-            ser = serial.Serial(self.port,9600,timeout=1)
-            logging.info("Established serial communication")
-
-        except Exception as e:
-            logging.info("Error occured while establishing the serial communication")
-            raise CustomException(e,sys)
-
-class SerialCommunication:
-    '''
-        class to initiate the variables for serial communication
-    '''
-    def __init__(self):
-        self.portobject = Port()
-        self.port = self.portobject.select_port()
-        self.ser = serial.Serial(self.port,9600,timeout=1)
-        
 
 #Create a class to control the car  
 class Controller:
@@ -109,9 +74,7 @@ class Controller:
         logging.info("Controller configuration starts")
         self.controllerconfig = ControllerConfig()
         logging.info("Controller configuartion completed")
-        self.communication_obj = SerialCommunication()
         
-    
     #Create a method to move the car
     def move_car(self):
         '''
@@ -129,20 +92,29 @@ class Controller:
        
             while True:
                 logging.info("Capturing frames from the cam")
+
+                #get the image of from the system cam
                 ret,frame = self.controllerconfig.cam.read()
                 logging.info("Captured frame")
+
+                #Flip the frame
                 frame = cv2.flip(frame,1)
 
                 logging.info("Finding hand in the captured frame")
+
+                #Find/detect the hands using the methods of HandDetector class
                 hands,frame = self.controllerconfig.detector.findHands(frame)
                 logging.info("Found hand")
 
                 if hands:
                     hands1 = hands[0]
                     logging.info("Counting how many finger are up")
+
+                    #Count the number of fingers up
                     fingers = self.controllerconfig.detector.fingersUp(hands1)
                     count = fingers.count(1)
 
+                    #Put text for number of fingers that are up
                     logging.info("Putting text for no. of fingures up")
                     cv2.putText(frame, str(count), (45, 375), cv2.FONT_HERSHEY_PLAIN,
                                 5, (255, 0, 0), 10)
@@ -170,13 +142,17 @@ class Controller:
 
 
                     logging.info("Sending commands to the arduino")
+                    
+                    #Send command to Arduino based on the number of fingers up
                     car_controller = SendCommands(count)
                     logging.info("Commands sent")
-
                     logging.info("Controlling the car")
                     car_controller.send_message()
 
+
                 logging.info("Displaying the frame")
+                
+                #Display the frame
                 cv2.imshow('Frame',frame)
 
                 if cv2.waitKey(1)&0xFF == 27:
